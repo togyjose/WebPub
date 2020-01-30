@@ -1,4 +1,5 @@
 #Script for analyzing C ONA Data
+#Making this change on Jan30 6pm
 
 setwd("/home/togy/Documents/R Practise")
 getwd()
