@@ -1,8 +1,10 @@
 # R_Scrip_WebPub
 
+# Please refer the ReadMe file to see how the input file needs to be structured.
+
 #Script for analyzing messages on an Enterprise Social Network
 
-setwd(<working directory>)
+setwd(<'working directory'>)
 install.packages("dplyr")
 install.packages("tidytext")
 install.packages("readxl")
@@ -14,42 +16,38 @@ library(readxl)
 library(tidytext)
 library(tidyr)
 library(reshape2)
+
+# Extracts the sentiment dictionaries that given sentiment scores, 
+# postive/negative tagging and emotion association like joy/curiosity/anxiety etc.
 get_sentiments("afinn")
 get_sentiments("bing")
 get_sentiments("nrc")
 
 
 # Convert data from an .xlsx to a R dataframe
-cons_org <- read_excel("Consolidated_Original.xlsx")
-
-cons_org$Sender_ID_int <- as.integer(cons_org$`Sender ID`)
-cons_org$Receiver_ID_int <- as.integer(cons_org$`Receiver ID`)
-cons_org$Message_ID_int <- as.integer(cons_org$`Message ID`)
-cons_org$Reply_ID_int <- as.integer(cons_org$`Reply ID`)
-cons_org$Thread_ID_int <- as.integer(cons_org$`Thread ID`)
-cons_org$Emp_ID_int <- as.integer(cons_org$`Emp ID`)
-
-cons_org[c("Thread ID","Sender ID", "Receiver ID", "Message ID", "Reply ID", "Emp ID", 
-           "Created At", "Original Post", "Grade Description", "Grade Code",
-           "Region", "Gender", "Sender Email", "Sender_ID_int", "Receiver_ID_int", "Reply_ID_int", 
-           "Thread_ID_int", "Emp_ID_int", "Trunc1", "Month", "Year")] <- list(NULL)
-
+cons_org <- read_excel(<'Messages file in xls format'>)
 cons_org
+
+# Review the structure of the file
 str(cons_org)
 
+# Convert dataframe into tidy data format
 tidy_messages <- cons_org %>% unnest_tokens(word, Message_Body)
 tidy_messages
 
+# Get stop words list
 data(stop_words)
 
+# Remove stop words from messages data
 tidy_messages <- tidy_messages %>%
   anti_join(stop_words)
 
+# Get wordwise count
 tidy_messages %>%
   count(word, sort = TRUE) 
 
+# Visualize represent word frequency 
 library(ggplot2)
-
 tidy_messages %>%
   count(word, sort = TRUE) %>%
   filter(n > 1500) %>%
@@ -59,73 +57,42 @@ tidy_messages %>%
   xlab(NULL) +
   coord_flip()
 
-nrc_joy <- get_sentiments("nrc") %>% 
-  filter(sentiment == "joy")
-
-tidy_messages %>%
-  inner_join(nrc_joy) %>%
-  count(word, sort = TRUE)
-
-str(tidy_messages)
+# Use the Bing dictionary to assign positive or negative sentiment and 
+# generate a sentiment score for each message
 
 library(tidyr)
-
 tidy_messages_sentiment <- tidy_messages %>% #
   inner_join(get_sentiments("bing")) %>%
   count(Group_Name, index = Month_Index, sentiment) %>%
   spread(sentiment, n, fill=0) %>%
   mutate(sentiment = positive - negative)
 
-str(tidy_messages_sentiment)
+# View sentiment scores for each message
 tidy_messages_sentiment
 
-# jane_austen_sentiment <- tidy_books %>%
-#   inner_join(get_sentiments("bing")) %>%
-#   count(book, index = linenumber %/% 80, sentiment) %>%
-#   spread(sentiment, n, fill = 0) %>%
-#   mutate(sentiment = positive - negative)
 
-# library(ggplot2)
-# 
-# ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
-#   geom_col(show.legend = FALSE) +
-#   facet_wrap(~book, ncol = 2, scales = "free_x")
-
-
+# By-group view of change in sentiment month-on-month
 library(ggplot2)
-
 ggplot(tidy_messages_sentiment, aes(index, sentiment, fill = Group_Name)) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~Group_Name, ncol = 3, scales = "free_x")
 
-# pride_prejudice <- tidy_books %>% 
-#   filter(book == "Pride & Prejudice")
-# 
-# pride_prejudice
-
-movie_buff_messages <- tidy_messages %>%
-  filter(Group_Name == 'Movie Buffs') %>%
+# We analyze data from a specfic group - "Book_Review"
+Book_Review_messages <- tidy_messages %>%
+  filter(Group_Name == 'Book_Review') %>%
   inner_join(get_sentiments("bing")) %>%
   count(word, sentiment, sort = TRUE)
-movie_buff_messages
+# Review how each word is contributing to overall sentiment
+Book_Review_messages
 
-movie_buffs_sentiment <- tidy_messages_sentiment %>%
-  filter(Group_Name == 'Movie Buffs')
-movie_buffs_sentiment
+# Convert Book_Review data into R tidydata format
+Book_Review_sentiment <- tidy_messages_sentiment %>%
+  filter(Group_Name == 'Book_Review')
+Book_Review_sentiment
 
-library(ggplot2)
-
-ggplot(movie_buffs_messages, aes(index, sentiment, fill = Group_Name)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~Group_Name, ncol = 3, scales = "free_x")
-
-movie_buff_tidy_messages <- tidy_messages %>%
-  inner_join(get_sentiments("bing")) %>%
-  filter(Group_Name == 'Movie Buffs') %>%
-  count(Group_Name, sentiment, word, sort = TRUE)
-movie_buff_tidy_messages
-
-movie_buff_tidy_messages %>%
+# Within the Book_Review community, analyze which terms are contributing 
+# most to positive or negative sentiment.
+Book_Review_tidy_messages %>%
   group_by(sentiment) %>%
   top_n(15) %>%
   ungroup() %>%
@@ -137,133 +104,87 @@ movie_buff_tidy_messages %>%
        x = NULL) +
   coord_flip()
 
-# library(wordcloud)
-# 
-# tidy_messages %>%
-#   anti_join(stop_words) %>%
-#   count(word) %>%
-#   with(wordcloud(word, n, max.words = 500))
+# Wordcloud for visualizing the key words used in the community
+library(wordcloud)
+tidy_messages %>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 500))
 
-#In the wordcloud we notice "user" is very visible - this is becuase "user"
-#is part of every @mention in the message eg "@Richard" will be 
-#printed as "User:123456" where 123456 is Richard's employee id. 
-#So we will remove "user" from this corpus by adding it to the 
-#Stop Words list
-
+# Use the wordcloud analysis to add new words to your Stop Words list.
+# For example - in your anaylsis if you notice the following words are repeating
+# often but dont add much value, then add them to your stop words using this code.
 custom_stop_words <- bind_rows(tibble(word = c("user","cloud","nice", "ha", "tag", NA, "www.yammer.com", "cognizant.com", "https", "3", "6", "101"),
                                       lexicon = c("custom")),
                                stop_words)
 
-custom_stop_words
-# 
-# tidy_messages %>%
-#   anti_join(custom_stop_words) %>%
-#   count(word) %>%
-#   with(wordcloud(word, n, max.words = 750))
-# 
-# library(reshape2)
-# 
-# tidy_messages %>%
-#   inner_join(get_sentiments("bing")) %>%
-#   count(word, sentiment, sort = TRUE) %>%
-#   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-#   comparison.cloud(colors = c("gray20", "gray80"),
-#                    max.words = 750)
-
-# Identify truly relevant words using the tf-idf construct
-
-library(dplyr)
-library(tidytext)
+## Identify truly relevant words using the 
+## tf-idf (term frequency - inter document frequency construct). We use the 
+## 'bind_tf_idf' to get clarity on words that truly relevant to a group.
 
 library(dplyr)
 library(janeaustenr)
 library(tidytext)
 
+# Convert individual words data in R tidydata format
 group_words <- tidy_messages %>%
-  #unnest_tokens(word, text) %>%
+  unnest_tokens(word, Message_Body) %>%
   count(Group_Name, word, sort = TRUE)
-
 group_words
 
+# Get the total word count at a Group Level
 total_words_m <- group_words %>%
   group_by (Group_Name) %>%
   summarize (total = sum(n))
-
 total_words_m
 
-group_words <- inner_join(group_words,total_words_m) %>%
+# Merge the above two datasets to get see how often is a word is repeating (n) and
+# what is the total word count of that Group (total). The term frequency will be n/total
+group_words <- left_join(group_words,total_words_m) %>%
   anti_join(custom_stop_words) 
-
 group_words
-
-library(ggplot2)
-
-ggplot(group_words, aes(n/total, fill = Group_Name)) +
-  geom_histogram(show.legend = FALSE) +
-  xlim(NA, 0.0009) +
-  facet_wrap(~Group_Name, ncol = 2, scales = "free_y")
-
 
 group_words_tfidf <- group_words %>%
   bind_tf_idf(word, Group_Name, n)
-group_words
 
+#Generates a tf-idf score for each word.
 group_words_tfidf %>%
   select(-total) %>%
   arrange(desc(tf_idf))
 group_words
 
-group_words_tfidf %>%
-  arrange(desc(tf_idf)) %>%
-  mutate(word = factor(word, levels = rev(unique(word)))) %>% 
-  group_by(Group_Name) %>% 
-  top_n(15) %>% 
-  ungroup() %>%
-  ggplot(aes(word, tf_idf, fill = Group_Name)) +
-  geom_col(show.legend = FALSE) +
-  labs(x = NULL, y = "tf-idf") +
-  facet_wrap(~Group_Name, ncol = 2, scales = "free") +
-  coord_flip()
+## Generating ngrams
 
-# Generating ngrams
-# 
+# Scans the entire corpus and generates word pairs. For example - the phrase "I work here"
+# will generate - "I work" and "work here"
 library(dplyr)
 library(tidytext)
-
 group_bigrams <- group_words %>%
-  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  unnest_tokens(bigram, Message_Body, token = "ngrams", n = 2) %>%
   select(-word, -n, -total)
 group_bigrams
 
-
+# Each bigram is seperated into two words for further analysis.
 library(tidyr)
-
 bigrams_separated <- austen_bigrams %>%
   separate(bigram, c("word1", "word2"), sep = " ")
 
+# Remove bigrams which may contain stopwords
 bigrams_filtered <- bigrams_separated %>%
   filter(!word1 %in% stop_words$word) %>%
   filter(!word2 %in% stop_words$word)
 
-# new bigram counts:
+# Get Count of bigrams
 bigram_counts <- bigrams_filtered %>% 
   count(word1, word2, sort = TRUE)
-
 bigram_counts
 
+# Join the bigrams back together
 bigrams_united <- bigrams_filtered %>%
   unite(bigram, word1, word2, sep = " ")
-
 bigrams_united
 
-# austen_books() %>%
-#   unnest_tokens(trigram, text, token = "ngrams", n = 3) %>%
-#   separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
-#   filter(!word1 %in% stop_words$word,
-#          !word2 %in% stop_words$word,
-#          !word3 %in% stop_words$word) %>%
-#   count(word1, word2, word3, sort = TRUE)
-# 
+# Generate trigrams
 group_trigrams <- cons_org %>%
   unnest_tokens(trigram, Message_Body, token = "ngrams", n = 3) %>%
   separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
@@ -273,13 +194,11 @@ group_trigrams <- cons_org %>%
   count(word1, word2, word3, sort = TRUE)
 group_trigrams
 
-###
-###
-# Topic Modeling
-###
-###
+## Topic Modeling. For Topic modelling the data needs to modified from tidy data format 
+# to the document-term-matrix format or dtm format. 
+# This is done using the cast_dtm function
 
-#install.packages("reshape2")
+install.packages("reshape2")
 library(reshape2)
 library(topicmodels)
 
@@ -291,10 +210,9 @@ tidy_messages_dtm <- tidy_messages %>%
   cast_dtm(Message_ID_int, word, n)
 tidy_messages_dtm
 
-# set a seed so that the output of the model is predictable
-#tidy_messages_dtm_lda <- LDA(tidy_messages_dtm, k=13, control = list(seed=1234))
-#tidy_messages_dtm_lda
-
+# This is where the actual Topic are generated using the LDA function.
+tidy_messages_dtm_lda <- LDA(tidy_messages_dtm, k=13, control = list(seed=1234))
+tidy_messages_dtm_lda
 
 # Get the per-topic-per-word probability i.e. for each topic 
 # which words have the highest probability of being present 
@@ -312,7 +230,6 @@ messages_top_terms <- message_topics %>%
 messages_top_terms
 
 # We can also visually inspect the top words in each topic
-
 library(ggplot2)
 message_top_terms %>%
   mutate(word = reorder_within(word, beta, topic)) %>%
@@ -328,9 +245,12 @@ message_top_terms %>%
 messages_gamma <- tidy(tidy_messages_dtm_lda, matrix = "gamma")
 messages_gamma
 
-####
-# Now we are effecitively classified our collection of messages into 
-# topics / groups in an automated scalable manner.
-####
+# By sorting the message by gamma value we can now effectively predict 
+# which topic it belongs to.
 
+####
+# Now we have effectively classified our collection of messages into 
+# topics / groups in an automated scalable manner. 
+# Please reach out to togyjose@hrness.in if you have any queries.
+####
 
