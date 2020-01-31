@@ -7,6 +7,7 @@ Versions used for running this R Script
 RStudio - Version 1.1.419
 
 File Format for Conversational Data used as input for this analysis
+
 Field 1 - Message_ID_int: Integer field that is unique identified for each message
 Field 2 - Month_ID_int: Integer field that represents the month number as an index
 Field 2 - Message_Body: Actual text of the message
